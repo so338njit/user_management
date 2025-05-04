@@ -7,6 +7,7 @@ import uuid
 import re
 from app.models.user_model import UserRole
 from app.utils.nickname_gen import generate_nickname
+from app.utils.email_gen import generate_email
 
 
 def validate_url(url: Optional[str]) -> Optional[str]:
@@ -18,7 +19,7 @@ def validate_url(url: Optional[str]) -> Optional[str]:
     return url
 
 class UserBase(BaseModel):
-    email: EmailStr = Field(..., example="john.doe@example.com")
+    email: EmailStr = Field(..., example=generate_email())
     nickname: Optional[str] = Field(None, min_length=3, pattern=r'^[\w-]+$', example=generate_nickname())
     first_name: Optional[str] = Field(None, example="John")
     last_name: Optional[str] = Field(None, example="Doe")
@@ -34,7 +35,7 @@ class UserBase(BaseModel):
         from_attributes = True
 
 class UserCreate(UserBase):
-    email: EmailStr = Field(..., example="john.doe@example.com")
+    email: EmailStr = Field(..., example=generate_email())
     password: str = Field(..., example="Secure*1234")
 
 class UserUpdate(UserBase):
