@@ -193,7 +193,7 @@ async def list_users(
         links=pagination_links  # Ensure you have appropriate logic to create these links
     )
 
-@router.post("/register/", response_model=UserResponse)
+@router.post("/register/", response_model=UserResponse, tags=["Login and Registration"])
 async def register_user(
     user_data: UserCreate,
     db: AsyncSession = Depends(get_db),
