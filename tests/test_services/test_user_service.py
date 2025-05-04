@@ -161,3 +161,13 @@ async def test_unlock_user_account(db_session, locked_user):
     assert unlocked, "The account should be unlocked"
     refreshed_user = await UserService.get_by_id(db_session, locked_user.id)
     assert not refreshed_user.is_locked, "The user should no longer be locked"
+
+@pytest.mark.asyncio
+async def test_login_user_unverified_email(db_session, unverified_user):
+    """Test that login with unverified email returns the user with an unverified flag."""
+    user = await UserService.login_user(db_session, unverified_user.email, "MySuperPassword$1234")
+    
+    # User should be returned (not None) but with the _unverified_email flag
+    assert user is not None
+    assert hasattr(user, '_unverified_email')
+    assert user._unverified_email is True

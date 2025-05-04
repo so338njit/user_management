@@ -212,32 +212,6 @@ async def register_user(
         raise HTTPException(status_code=400, detail="User registration failed")
     
     return user
-"""@router.post("/register/", response_model=UserResponse, tags=["Login and Registration"])
-async def register_user(
-    user_data: UserCreate,
-    db: AsyncSession = Depends(get_db),
-    email_service: EmailService = Depends(get_email_service)
-):
-    # Create a copy of the user data
-    user_dict = user_data.model_dump()
-    
-    # Check if the email field exists and is not None
-    if not user_dict.get("email"):
-        # Generate a random email if none is provided
-        user_dict["email"] = generate_email()
-    else:
-        # Check if the provided email already exists
-        existing_user = await UserService.get_by_email(db, user_dict["email"])
-        if existing_user:
-            raise HTTPException(status_code=400, detail="Email already exists")
-    
-    # Register the user
-    user = await UserService.register_user(db, user_dict, email_service)
-    
-    if not user:
-        raise HTTPException(status_code=400, detail="User registration failed")
-    
-    return user"""
 
 @router.post("/login/", response_model=TokenResponse, tags=["Login and Registration"])
 async def login(form_data: OAuth2PasswordRequestForm = Depends(), session: AsyncSession = Depends(get_db)):
@@ -245,34 +219,23 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends(), session: Async
         raise HTTPException(status_code=400, detail="Account locked due to too many failed login attempts.")
 
     user = await UserService.login_user(session, form_data.username, form_data.password)
-    if user:
-        access_token_expires = timedelta(minutes=settings.access_token_expire_minutes)
-
-        access_token = create_access_token(
-            data={"sub": user.email, "role": str(user.role.name)},
-            expires_delta=access_token_expires
+    
+    if not user:
+        raise HTTPException(status_code=401, detail="Incorrect email or password.")
+    
+    # Check if this is an unverified email case
+    if hasattr(user, '_unverified_email') and user._unverified_email:
+        raise HTTPException(
+            status_code=403, 
+            detail="Email address not verified. Please verify your email before logging in."
         )
-
-        return {"access_token": access_token, "token_type": "bearer"}
-    raise HTTPException(status_code=401, detail="Incorrect email or password.")
-
-@router.post("/login/", include_in_schema=False, response_model=TokenResponse, tags=["Login and Registration"])
-async def login(form_data: OAuth2PasswordRequestForm = Depends(), session: AsyncSession = Depends(get_db)):
-    if await UserService.is_account_locked(session, form_data.username):
-        raise HTTPException(status_code=400, detail="Account locked due to too many failed login attempts.")
-
-    user = await UserService.login_user(session, form_data.username, form_data.password)
-    if user:
-        access_token_expires = timedelta(minutes=settings.access_token_expire_minutes)
-
-        access_token = create_access_token(
-            data={"sub": user.email, "role": str(user.role.name)},
-            expires_delta=access_token_expires
-        )
-
-        return {"access_token": access_token, "token_type": "bearer"}
-    raise HTTPException(status_code=401, detail="Incorrect email or password.")
-
+            
+    access_token_expires = timedelta(minutes=settings.access_token_expire_minutes)
+    access_token = create_access_token(
+        data={"sub": user.email, "role": str(user.role.name)},
+        expires_delta=access_token_expires
+    )
+    return {"access_token": access_token, "token_type": "bearer"}
 
 @router.get("/verify-email/{user_id}/{token}", status_code=status.HTTP_200_OK, name="verify_email", tags=["Login and Registration"])
 async def verify_email(user_id: UUID, token: str, db: AsyncSession = Depends(get_db), email_service: EmailService = Depends(get_email_service)):
