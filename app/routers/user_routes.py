@@ -193,24 +193,23 @@ async def list_users(
         links=pagination_links  # Ensure you have appropriate logic to create these links
     )
 
-@router.post("/register/", response_model=UserResponse)
+@router.post("/register/", response_model=UserResponse, tags=["Login and Registration"])
 async def register_user(
     user_data: UserCreate,
     db: AsyncSession = Depends(get_db),
     email_service: EmailService = Depends(get_email_service)
 ):
+    # Create a copy of the user data
     user_dict = user_data.model_dump()
     
-    # Any code you have for random email generation
-
+    # Replace the email with a newly generated one
+    user_dict["email"] = generate_email()
+    
+    # Register the user with the random email
     user = await UserService.register_user(db, user_dict, email_service)
     
-    # Add this check to return a 400 status code when user is None
     if not user:
-        raise HTTPException(
-            status_code=400, 
-            detail="Email already exists"
-        )
+        raise HTTPException(status_code=400, detail="User registration failed")
     
     return user
 
