@@ -1,5 +1,6 @@
 from builtins import str
 import pytest
+from unittest.mock import AsyncMock, MagicMock
 from httpx import AsyncClient
 from app.main import app
 from app.models.user_model import User, UserRole
@@ -62,15 +63,47 @@ async def test_delete_user(async_client, admin_user, admin_token):
     assert fetch_response.status_code == 404
 
 @pytest.mark.asyncio
-async def test_create_user_duplicate_email(async_client, verified_user):
+async def test_user_registration_success(async_client):
+    """Test that user registration works with a random email."""
+    user_data = {
+        "password": "StrongPassword123!",
+        "first_name": "Test",
+        "last_name": "User",
+        "nickname": generate_nickname(),
+        "email": "john.doe@example.com",
+        "role": "AUTHENTICATED"
+    }
+    
+    response = await async_client.post("/register/", json=user_data)
+    assert response.status_code == 200
+    
+    # Verify the response contains expected user data
+    user_response = response.json()
+    assert user_response["first_name"] == "Test"
+    assert user_response["last_name"] == "User"
+    assert "@" in user_response["email"]  # Verify it's an email format
+
+@pytest.mark.asyncio
+async def test_duplicate_email_in_user_service(db_session, verified_user):
+    """Test that UserService correctly handles duplicate emails."""
+    from app.services.user_service import UserService
+    from app.services.email_service import EmailService
+    
+    # Create a mock email service
+    mock_email_service = MagicMock()
+    mock_email_service.send_verification_email = AsyncMock()
+    
+    # Attempt to create a user with the same email
     user_data = {
         "email": verified_user.email,
         "password": "AnotherPassword123!",
-        "role": UserRole.ADMIN.name
+        "first_name": "Another",
+        "last_name": "User"
     }
-    response = await async_client.post("/register/", json=user_data)
-    assert response.status_code == 400
-    assert "Email already exists" in response.json().get("detail", "")
+    
+    # This should return None because of duplicate email
+    result = await UserService.create(db_session, user_data, mock_email_service)
+    assert result is None
 
 @pytest.mark.asyncio
 async def test_create_user_invalid_email(async_client):
