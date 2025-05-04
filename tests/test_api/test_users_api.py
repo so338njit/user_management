@@ -165,7 +165,13 @@ async def test_login_unverified_user(async_client, unverified_user):
         "password": "MySuperPassword$1234"
     }
     response = await async_client.post("/login/", data=urlencode(form_data), headers={"Content-Type": "application/x-www-form-urlencoded"})
-    assert response.status_code == 401
+    
+    # We now expect a 403 Forbidden status code instead of 401
+    assert response.status_code == 403
+    
+    # Check for the specific error message about email verification
+    error_detail = response.json().get("detail", "")
+    assert "Email address not verified" in error_detail
 
 @pytest.mark.asyncio
 async def test_login_locked_user(async_client, locked_user):
