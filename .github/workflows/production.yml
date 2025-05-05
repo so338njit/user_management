@@ -13,7 +13,7 @@ jobs:
     runs-on: ubuntu-latest, workflow_dispatch
     strategy:
       matrix:
-        python-version: [3.10.12] # Define Python versions here
+        python-version: [3.13.3] # Define Python versions here
     services:
       postgres:
         image: postgres:latest
@@ -48,6 +48,10 @@ jobs:
       - name: Run tests with Pytest
         env:
           DATABASE_URL: postgresql+asyncpg://user:password@localhost:5432/myappdb  # Configure the DATABASE_URL environment variable for tests
+          SMTP_SERVER: ${{ secrets.SMTP_SERVER }}
+          SMTP_PORT: ${{ secrets.SMTP_PORT }}
+          SMTP_USERNAME: ${{ secrets.SMTP_USERNAME }}
+          SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}          
         run: pytest
 
   build-and-push-docker:
