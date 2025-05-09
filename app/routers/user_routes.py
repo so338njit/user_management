@@ -248,3 +248,49 @@ async def verify_email(user_id: UUID, token: str, db: AsyncSession = Depends(get
     if await UserService.verify_email_with_token(db, user_id, token):
         return {"message": "Email verified successfully"}
     raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid or expired verification token")
+
+@router.post("/users/{user_id}/unlock", 
+            status_code=status.HTTP_200_OK, 
+            name="unlock_user", 
+            tags=["User Management Requires (Admin or Manager Roles)"])
+async def unlock_user(
+    user_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    token: str = Depends(oauth2_scheme),
+    current_user: dict = Depends(require_role(["ADMIN", "MANAGER"]))
+):
+    """
+    Unlock a user account that has been locked due to too many failed login attempts.
+    
+    - **user_id**: UUID of the user account to unlock.
+    
+    Returns:
+    - A success message if the account was successfully unlocked.
+    - 404 if the user does not exist.
+    - 400 if the user account is not locked.
+    """
+    # Verify user exists
+    user = await UserService.get_by_id(db, user_id)
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found"
+        )
+    
+    # Check if the account is actually locked
+    if not user.is_locked:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="User account is not locked"
+        )
+    
+    # Attempt to unlock the account
+    success = await UserService.unlock_user_account(db, user_id)
+    
+    if not success:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to unlock user account"
+        )
+    
+    return {"message": f"User account {user.email} has been successfully unlocked"}

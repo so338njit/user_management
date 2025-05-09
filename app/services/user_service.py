@@ -154,28 +154,6 @@ class UserService:
         await session.commit()
         return user
 
-    """@classmethod
-    async def login_user(cls, session: AsyncSession, email: str, password: str) -> Optional[User]:
-        user = await cls.get_by_email(session, email)
-        if user:
-            if user.email_verified is False:
-                return None
-            if user.is_locked:
-                return None
-            if verify_password(password, user.hashed_password):
-                user.failed_login_attempts = 0
-                user.last_login_at = datetime.now(timezone.utc)
-                session.add(user)
-                await session.commit()
-                return user
-            else:
-                user.failed_login_attempts += 1
-                if user.failed_login_attempts >= settings.max_login_attempts:
-                    user.is_locked = True
-                session.add(user)
-                await session.commit()
-        return None"""
-
     @classmethod
     async def is_account_locked(cls, session: AsyncSession, email: str) -> bool:
         user = await cls.get_by_email(session, email)
