@@ -229,3 +229,85 @@ async def test_list_users_unauthorized(async_client, user_token):
         headers={"Authorization": f"Bearer {user_token}"}
     )
     assert response.status_code == 403  # Forbidden, as expected for regular user
+
+@pytest.mark.asyncio
+async def test_unlock_user_account_api(async_client, locked_user, admin_token):
+    """Test that an admin can unlock a locked user account via the API."""
+    # First confirm the user is indeed locked
+    assert locked_user.is_locked is True
+    
+    # Attempt to unlock the user account as admin
+    headers = {"Authorization": f"Bearer {admin_token}"}
+    response = await async_client.post(
+        f"/users/{locked_user.id}/unlock", 
+        headers=headers
+    )
+    
+    # Check response
+    assert response.status_code == 200
+    assert "successfully unlocked" in response.json().get("message", "")
+    
+    # Verify the user is now unlocked in the database
+    from app.services.user_service import UserService
+    from app.dependencies import get_db
+    db_session = await anext(get_db())
+    
+    refreshed_user = await UserService.get_by_id(db_session, locked_user.id)
+    assert refreshed_user.is_locked is False
+    assert refreshed_user.failed_login_attempts == 0
+
+@pytest.mark.asyncio
+async def test_unlock_user_access_denied(async_client, locked_user, user_token):
+    """Test that a regular user cannot unlock a locked account."""
+    headers = {"Authorization": f"Bearer {user_token}"}
+    response = await async_client.post(
+        f"/users/{locked_user.id}/unlock", 
+        headers=headers
+    )
+    
+    # Regular users should get 403 Forbidden
+    assert response.status_code == 403
+
+@pytest.mark.asyncio
+async def test_unlock_nonexistent_user(async_client, admin_token):
+    """Test attempting to unlock a user that doesn't exist."""
+    non_existent_user_id = "00000000-0000-0000-0000-000000000000"  # Valid UUID format
+    headers = {"Authorization": f"Bearer {admin_token}"}
+    
+    response = await async_client.post(
+        f"/users/{non_existent_user_id}/unlock", 
+        headers=headers
+    )
+    
+    # Should get 404 Not Found
+    assert response.status_code == 404
+    assert "User not found" in response.json().get("detail", "")
+
+@pytest.mark.asyncio
+async def test_unlock_already_unlocked_user(async_client, verified_user, admin_token):
+    """Test attempting to unlock a user that is not locked."""
+    # Ensure user is not locked
+    assert verified_user.is_locked is False
+    
+    headers = {"Authorization": f"Bearer {admin_token}"}
+    response = await async_client.post(
+        f"/users/{verified_user.id}/unlock", 
+        headers=headers
+    )
+    
+    # Should get 400 Bad Request
+    assert response.status_code == 400
+    assert "not locked" in response.json().get("detail", "")
+
+@pytest.mark.asyncio
+async def test_unlock_user_by_manager(async_client, locked_user, manager_token):
+    """Test that a manager can also unlock a locked user account."""
+    headers = {"Authorization": f"Bearer {manager_token}"}
+    response = await async_client.post(
+        f"/users/{locked_user.id}/unlock", 
+        headers=headers
+    )
+    
+    # Check response
+    assert response.status_code == 200
+    assert "successfully unlocked" in response.json().get("message", "")
