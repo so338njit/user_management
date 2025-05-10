@@ -45,15 +45,63 @@ jobs:
           python -m pip install --upgrade pip
           pip install --only-binary :all: pydantic
           pip install -r requirements.txt
-          
+      
+      - name: Debug SMTP settings
+        run: |
+          echo "SMTP settings:"
+          echo "Server: ${{ secrets.SMTP_SERVER }}"
+          echo "Port: ${{ secrets.SMTP_PORT }}"
+          echo "Converting port to integer:"
+          python -c "
+          try:
+              port = '${{ secrets.SMTP_PORT }}'
+              print(f'Port value: {port}')
+              print(f'Port type: {type(port).__name__}')
+              port_int = int(port) if port else 2525
+              print(f'Port as int: {port_int}')
+          except Exception as e:
+              print(f'Error converting port: {e}')
+          "
+          echo "Mailtrap credentials exist:"
+          echo "Username exists: ${{ secrets.SMTP_USERNAME != '' }}"
+          echo "Password exists: ${{ secrets.SMTP_PASSWORD != '' }}"
+
       - name: Run tests with Pytest
         env:
-          DATABASE_URL: postgresql+asyncpg://user:password@localhost:5432/myappdb  # Configure the DATABASE_URL environment variable for tests
-          SMTP_SERVER: ${{ secrets.SMTP_SERVER }}
-          SMTP_PORT: ${{ secrets.SMTP_PORT }}
+          DATABASE_URL: postgresql+asyncpg://user:password@localhost:5432/myappdb
+          # Hardcoded Mailtrap settings to ensure they're correct
+          SMTP_SERVER: "smtp.mailtrap.io"
+          SMTP_PORT: "2525"
           SMTP_USERNAME: ${{ secrets.SMTP_USERNAME }}
-          SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}          
-        run: pytest
+          SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
+          # Enable debug logging
+          PYTHONVERBOSE: "1"
+          PYTHONUNBUFFERED: "1"
+          LOG_LEVEL: "DEBUG"
+        run: |
+          # Add configuration check before running tests
+          python -c "
+          import os
+          import sys
+          
+          print('Python version:', sys.version)
+          print('Environment variables:')
+          print(f'SMTP_SERVER: {os.environ.get(\"SMTP_SERVER\")}')
+          print(f'SMTP_PORT: {os.environ.get(\"SMTP_PORT\")} (type: {type(os.environ.get(\"SMTP_PORT\")).__name__})')
+          
+          try:
+              port_as_int = int(os.environ.get(\"SMTP_PORT\", \"2525\"))
+              print(f'SMTP_PORT as int: {port_as_int}')
+          except Exception as e:
+              print(f'Error converting port: {e}')
+          
+          # Check if username/password are set (without exposing them)
+          print(f'SMTP_USERNAME set: {bool(os.environ.get(\"SMTP_USERNAME\"))}') 
+          print(f'SMTP_PASSWORD set: {bool(os.environ.get(\"SMTP_PASSWORD\"))}')
+          "
+          
+          # Run pytest with more verbose output
+          python -m pytest -v
 
   build-and-push-docker:
     needs: test
