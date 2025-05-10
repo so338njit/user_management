@@ -9,7 +9,7 @@ import logging
 class SMTPClient:
     def __init__(self, server: str, port: int, username: str, password: str):
         self.server = server
-        self.port = port
+        self.port = int(port) if isinstance(port, str) else port
         self.username = username
         self.password = password
 
@@ -21,11 +21,16 @@ class SMTPClient:
             message['To'] = recipient
             message.attach(MIMEText(html_content, 'html'))
 
-            with smtplib.SMTP(self.server, self.port) as server:
-                server.starttls()  # Use TLS
-                server.login(self.username, self.password)
-                server.sendmail(self.username, recipient, message.as_string())
+            # Create the SMTP connection and explicitly connect
+            server = smtplib.SMTP(self.server, self.port)
+            server.connect(self.server, self.port)  # Explicitly connect to the server
+            server.starttls()  # Use TLS
+            server.login(self.username, self.password)
+            server.sendmail(self.username, recipient, message.as_string())
+            server.quit()  # Close the connection
+            
             logging.info(f"Email sent to {recipient}")
+            return True
         except Exception as e:
             logging.error(f"Failed to send email: {str(e)}")
             raise
