@@ -68,9 +68,11 @@ jobs:
 
       - name: Run tests with Pytest
         env:
+
           DATABASE_URL: postgresql+asyncpg://user:password@localhost:5432/myappdb
           # Hardcoded Mailtrap settings to ensure they're correct
           SMTP_SERVER: "smtp.mailtrap.io"
+
           SMTP_PORT: "2525"
           SMTP_USERNAME: ${{ secrets.SMTP_USERNAME }}
           SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
