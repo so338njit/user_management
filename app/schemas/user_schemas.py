@@ -28,6 +28,7 @@ class UserBase(BaseModel):
     linkedin_profile_url: Optional[str] =Field(None, example="https://linkedin.com/in/johndoe")
     github_profile_url: Optional[str] = Field(None, example="https://github.com/johndoe")
     role: UserRole
+    is_professional: Optional[bool] = Field(default=False, example=False)
 
     _validate_urls = validator('profile_picture_url', 'linkedin_profile_url', 'github_profile_url', pre=True, allow_reuse=True)(validate_url)
  
@@ -48,11 +49,31 @@ class UserUpdate(UserBase):
     linkedin_profile_url: Optional[str] =Field(None, example="https://linkedin.com/in/johndoe")
     github_profile_url: Optional[str] = Field(None, example="https://github.com/johndoe")
     role: Optional[str] = Field(None, example="AUTHENTICATED")
+    is_professional: Optional[bool] = Field(None, example=False)
 
     @root_validator(pre=True)
     def check_at_least_one_value(cls, values):
         if not any(values.values()):
             raise ValueError("At least one field must be provided for update")
+        return values
+
+class ProfessionalStatusUpdate(BaseModel):
+    is_professional: bool = Field(..., example=True)
+
+class UserProfileUpdate(BaseModel):
+    first_name: Optional[str] = Field(None, example="John")
+    last_name: Optional[str] = Field(None, example="Doe")
+    bio: Optional[str] = Field(None, example="Experienced software developer specializing in web applications.")
+    profile_picture_url: Optional[str] = Field(None, example="https://example.com/profiles/john.jpg")
+    linkedin_profile_url: Optional[str] =Field(None, example="https://linkedin.com/in/johndoe")
+    github_profile_url: Optional[str] = Field(None, example="https://github.com/johndoe")
+    
+    _validate_urls = validator('profile_picture_url', 'linkedin_profile_url', 'github_profile_url', pre=True, allow_reuse=True)(validate_url)
+
+    @root_validator(pre=True)
+    def check_at_least_one_value(cls, values):
+        if not any(values.values()):
+            raise ValueError("At least one field must be provided for profile update")
         return values
 
 class UserResponse(UserBase):
@@ -77,7 +98,8 @@ class UserListResponse(BaseModel):
         "last_name": "Doe", "bio": "Experienced developer", "role": "AUTHENTICATED",
         "profile_picture_url": "https://example.com/profiles/john.jpg", 
         "linkedin_profile_url": "https://linkedin.com/in/johndoe", 
-        "github_profile_url": "https://github.com/johndoe"
+        "github_profile_url": "https://github.com/johndoe",
+        "is_professional": True
     }])
     total: int = Field(..., example=100)
     page: int = Field(..., example=1)

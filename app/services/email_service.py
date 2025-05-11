@@ -32,7 +32,8 @@ class EmailService:
         subject_map = {
             'email_verification': "Verify Your Account",
             'password_reset': "Password Reset Instructions",
-            'account_locked': "Account Locked Notification"
+            'account_locked': "Account Locked Notification",
+            'professional_status_update': "Your Professional Status Update"
         }
 
         if email_type not in subject_map:
@@ -65,3 +66,28 @@ class EmailService:
             "verification_url": verification_url,
             "email": user.email
         }, 'email_verification')
+        
+    async def send_status_notification(self, user: User, status_change: str):
+        """
+        Send a notification to the user about their professional status change.
+        
+        Args:
+            user: User object to notify
+            status_change: Description of the status change
+        """
+        logging.info(f"Sending professional status notification to user {user.id} ({user.email})")
+        
+        try:
+            await self.send_user_email({
+                "name": user.first_name or user.nickname or "User",
+                "status_change": status_change,
+                "email": user.email,
+                "is_professional": user.is_professional
+            }, 'professional_status_update')
+            
+            logging.info(f"Successfully sent professional status notification to {user.email}")
+        except Exception as e:
+            logging.error(f"Failed to send professional status notification: {str(e)}")
+            # We'll re-raise to maintain consistent exception behavior
+            raise
+    
