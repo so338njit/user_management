@@ -231,7 +231,7 @@ async def test_list_users_unauthorized(async_client, user_token):
     assert response.status_code == 403  # Forbidden, as expected for regular user
 
 @pytest.mark.asyncio
-async def test_unlock_user_account_api(async_client, locked_user, admin_token):
+async def test_unlock_user_account_api(async_client, locked_user, admin_token, db_session):
     """Test that an admin can unlock a locked user account via the API."""
     # First confirm the user is indeed locked
     assert locked_user.is_locked is True
@@ -239,7 +239,7 @@ async def test_unlock_user_account_api(async_client, locked_user, admin_token):
     # Attempt to unlock the user account as admin
     headers = {"Authorization": f"Bearer {admin_token}"}
     response = await async_client.post(
-        f"/users/{locked_user.id}/unlock", 
+        f"/users/{locked_user.id}/unlock",
         headers=headers
     )
     
@@ -248,13 +248,11 @@ async def test_unlock_user_account_api(async_client, locked_user, admin_token):
     assert "successfully unlocked" in response.json().get("message", "")
     
     # Verify the user is now unlocked in the database
-    from app.services.user_service import UserService
-    from app.dependencies import get_db
-    db_session = await anext(get_db())
+    await db_session.refresh(locked_user)  # Refresh the user object directly
     
-    refreshed_user = await UserService.get_by_id(db_session, locked_user.id)
-    assert refreshed_user.is_locked is False
-    assert refreshed_user.failed_login_attempts == 0
+    # Now check the unlocked user attributes
+    assert locked_user.is_locked is False
+    assert locked_user.failed_login_attempts == 0  # Check that attempts were reset
 
 @pytest.mark.asyncio
 async def test_unlock_user_access_denied(async_client, locked_user, user_token):

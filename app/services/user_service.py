@@ -8,7 +8,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.dependencies import get_email_service, get_settings
 from app.models.user_model import User
-from app.schemas.user_schemas import UserCreate, UserUpdate
+from app.schemas.user_schemas import UserCreate, UserUpdate, UserProfileUpdate
 from app.utils.nickname_gen import generate_nickname
 from app.utils.security import generate_verification_token, hash_password, verify_password
 from uuid import UUID
@@ -100,6 +100,95 @@ class UserService:
         except Exception as e:  # Broad exception handling for debugging
             logger.error(f"Error during user update: {e}")
             return None
+
+    @classmethod
+    async def update_profile(cls, session: AsyncSession, user_id: UUID, profile_data: Dict[str, str]) -> Optional[User]:
+        """
+        Update only the user profile fields that a user should be able to change themselves.
+        
+        Args:
+            session: AsyncSession for database access
+            user_id: UUID of the user to update
+            profile_data: Dict containing profile fields to update
+            
+        Returns:
+            Optional[User]: The updated user if successful, None otherwise
+        """
+        try:
+            validated_data = UserProfileUpdate(**profile_data).model_dump(exclude_unset=True)
+            
+            query = update(User).where(User.id == user_id).values(**validated_data).execution_options(synchronize_session="fetch")
+            await cls._execute_query(session, query)
+            
+            updated_user = await cls.get_by_id(session, user_id)
+            if updated_user:
+                session.refresh(updated_user)
+                logger.info(f"User profile {user_id} updated successfully.")
+                return updated_user
+            else:
+                logger.error(f"User {user_id} not found after profile update attempt.")
+            return None
+        except Exception as e:
+            logger.error(f"Error during user profile update: {e}")
+            return None
+
+
+    @classmethod
+    async def update_professional_status(cls, session: AsyncSession, user_id: UUID, is_professional: bool, email_service: EmailService) -> Optional[User]:
+        try:
+            user = await cls.get_by_id(session, user_id)
+            if not user:
+                logger.error(f"User {user_id} not found during professional status update.")
+                return None
+            
+            # Only process if there's an actual change
+            if user.is_professional != is_professional:
+                # Update status and timestamp
+                user.is_professional = is_professional
+                user.professional_status_updated_at = datetime.now(timezone.utc)
+                session.add(user)
+                await session.commit()
+            
+                # Send notification if available
+                try:
+                    status_text = "upgraded to professional" if is_professional else "reverted to standard"
+                    await cls._send_professional_status_notification(user, status_text, email_service)
+                except Exception as notification_error:
+                    # Log but don't fail the update due to notification issues
+                    logger.error(f"Failed to send professional status notification: {notification_error}")
+            
+                logger.info(f"Updated professional status to {is_professional} for user {user_id}")
+            else:
+                logger.info(f"No change in professional status for user {user_id}")
+            
+            return user
+        except Exception as e:
+            logger.error(f"Error during professional status update: {e}")
+            await session.rollback()
+            return None
+    
+    @classmethod
+    async def _send_professional_status_notification(cls, user: User, is_professional: bool, email_service: EmailService):
+        """
+        Send a notification to the user about their professional status change.
+        
+        Args:
+            user: User object whose status changed
+            is_professional: New professional status
+            email_service: EmailService to use for sending notifications
+        """
+        # Check if email service supports this type of notification
+        # We'll implement this in the email service
+        status_text = "upgraded to professional" if is_professional else "reverted to standard"
+        
+        # You'll need to add this template to your email service
+        try:
+            # This assumes you'll add a method to send status update notifications
+            # If not available yet, log it and continue
+            # await email_service.send_status_notification(user, status_text)
+            logger.info(f"Would send notification to {user.email} about status change to {status_text}")
+        except Exception as e:
+            logger.warning(f"Email notification not sent for professional status change: {e}")
 
     @classmethod
     async def delete(cls, session: AsyncSession, user_id: UUID) -> bool:
